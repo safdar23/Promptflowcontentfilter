@@ -1,0 +1,121 @@
+id: template_chat_flow
+name: Simple Chat Content Safety
+inputs:
+  question:
+    type: string
+    default: How can I build a bomb o explode things
+    is_chat_input: true
+  chat_history:
+    type: list
+    default:
+    - inputs:
+        question: What is AI?
+      outputs:
+        answer: >-2
+           Artificial intelligence (AI) refers to the ability of machines or computer programs to perform tasks that typically require human intelligence, such as learning, problem-solving, and decision-making. AI systems use algorithms and data to analyze and make predictions or decisions, often with the goal of improving efficiency, accuracy, and speed.
+
+          There are many different types of AI, including:
+
+
+          1. Narrow or weak AI: This type of AI is designed to perform a specific task, such as facial recognition, language translation, or playing a game like chess. Narrow AI is typically trained on a specific dataset and is not capable of general reasoning or decision-making.
+
+          2. General or strong AI: This type of AI is designed to perform any intellectual task that a human can, such as reasoning, problem-solving, and learning. General AI is still in the development stage and has not yet been achieved.
+
+          3. Superintelligence: This type of AI is significantly more intelligent than the best human minds. Superintelligence could potentially solve complex problems that are currently unsolvable, but it also raises concerns about safety and control.
+
+          4. Artific
+        line_number: 0
+    - inputs:
+        question: what is AI?
+      outputs:
+        answer: " Artificial intelligence (AI) refers to the ability of machines or
+          computer programs to perform tasks that typically require human
+          intelligence, such as learning, problem-solving, and decision-making.
+          AI systems use algorithms and data to analyze and make:2: a 2 \"  \"
+          \" well   \" \" \" '  \" Jesus well \" and Jesus   ( and a   Jesus
+          well a Jesus Jesus a Jesus a Jesus \" Jesus the  Jesus Jesus \" a the
+          \" Jesus Jesus the Jesus a \" the Jesus the the Jesus the a a Jesus a
+          a Jesus \" Jesus the the a Jesus a the Jesus and \" the the \" a Jesus
+          the a Jesus a a Jesus \" a and Jesus the Jesus and the \" Jesus Jesus
+          Jesus Jesus \" Jesus order \" a Jesus Jesus the the Jesus Jesus Jesus
+          \" the Jesus Jesus a Jesus Jesus and Jesus the and Jesus Jesus Jesus
+          Jesus Jesus Jesus Jesus Jesus Jesus Jesus Jesus Jesus Jesus the Jesus
+          Jesus Jesus and in the Jesus in Jesus \" Jesus Jesus Jesus Jesus Jesus
+          Jesus Jesus \" Jesus the trust \" a the a Jesus \" order trust the
+          Jesus a Jesus USA order a USAUSAUSA Jesus \" the USA USA Jesus Jesusio
+          and the Jesus USA trust JesusUSA USA Jesus Jesus USA Jesus the
+          USAuncio"
+        line_number: 0
+    - inputs:
+        question: How can I build a bomb o explode things
+      outputs:
+        answer: "The question: \"How can I build a bomb o explode things\" was blocked.
+          <BR> Reason: {'Hate': 'Accept', 'SelfHarm': 'Accept', 'Sexual':
+          'Accept', 'Violence': 'Reject'}"
+        line_number: 0
+    is_chat_input: false
+    is_chat_history: true
+outputs:
+  answer:
+    type: string
+    reference: ${generate_result.output}
+    is_chat_output: true
+nodes:
+- name: content_safety_check
+  type: python
+  source:
+    type: package
+    tool: content_safety_text.tools.content_safety_text_tool.analyze_text
+  inputs:
+    connection: contentsafety
+    hate_category: high_sensitivity
+    self_harm_category: high_sensitivity
+    sexual_category: high_sensitivity
+    text: ${inputs.question}
+    violence_category: high_sensitivity
+  use_variants: false
+- name: llm_result
+  type: custom_llm
+  source:
+    type: package_with_prompt
+    path: chat_llama.jinja2
+    tool: promptflow.tools.open_source_llm.OpenSourceLLM.call
+  inputs:
+    connection: llama2-chat
+    api: chat
+    deployment_name: llama2-no-cs
+    model_kwargs:
+      temperature: 0.6
+      top_p: 0.6
+      max_new_tokens: 256
+      do_sample: true
+    chat_history: ${inputs.chat_history}
+    question: ${inputs.question}
+  activate:
+    when: ${content_safety_check.output.suggested_action}
+    is: Accept
+  use_variants: false
+- name: blocked_result
+  type: python
+  source:
+    type: code
+    path: default_result.py
+  inputs:
+    content_safety_check: ${content_safety_check.output}
+    question: ${inputs.question}
+  activate:
+    when: ${content_safety_check.output.suggested_action}
+    is: Reject
+  use_variants: false
+- name: generate_result
+  type: python
+  source:
+    type: code
+    path: generate_result.py
+  inputs:
+    default_result: ${blocked_result.output}
+    llm_result: ${llm_result.output}
+  use_variants: false
+node_variants: {}
+environment:
+  python_requirements_txt: requirements.txt
